@@ -274,11 +274,14 @@ with col3:
 # ==========================================
 # CREATE DATAFRAME
 # ==========================================
-input_data = pd.DataFrame([{
+raw_input = pd.DataFrame([{
     "Account length": account_length,
     "Area code": area_code,
-    "International plan": international_plan,
-    "Voice mail plan": voice_mail_plan,
+
+    # FIXED ENCODING
+    "International plan": 1 if international_plan == "Yes" else 0,
+    "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
+
     "Number vmail messages": number_vmail_messages,
     "Total day minutes": total_day_minutes,
     "Total day calls": total_day_calls,
