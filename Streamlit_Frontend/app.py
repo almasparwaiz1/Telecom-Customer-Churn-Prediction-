@@ -274,14 +274,11 @@ with col3:
 # ==========================================
 # CREATE DATAFRAME
 # ==========================================
-raw_input = pd.DataFrame([{
+input_data = pd.DataFrame([{
     "Account length": account_length,
     "Area code": area_code,
-
-    # FIXED ENCODING
-    "International plan": 1 if international_plan == "Yes" else 0,
-    "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
-
+    "International plan": international_plan,
+    "Voice mail plan": voice_mail_plan,
     "Number vmail messages": number_vmail_messages,
     "Total day minutes": total_day_minutes,
     "Total day calls": total_day_calls,
@@ -305,31 +302,32 @@ raw_input = pd.DataFrame([{
 st.markdown("<br>", unsafe_allow_html=True)
 predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
-if predict_btn:
-    try:
+raw_input = pd.DataFrame([{
+    "Account length": account_length,
+    "Area code": area_code,
 
-        # CREATE RAW INPUT
-        raw_input = pd.DataFrame([{
-            "Account length": account_length,
-            "Area code": area_code,
-            "International plan": international_plan,
-            "Voice mail plan": voice_mail_plan,
-            "Number vmail messages": number_vmail_messages,
-            "Total day minutes": total_day_minutes,
-            "Total day calls": total_day_calls,
-            "Total day charge": total_day_charge,
-            "Total eve minutes": total_eve_minutes,
-            "Total eve calls": total_eve_calls,
-            "Total eve charge": total_eve_charge,
-            "Total night minutes": total_night_minutes,
-            "Total night calls": total_night_calls,
-            "Total night charge": total_night_charge,
-            "Total intl minutes": total_intl_minutes,
-            "Total intl calls": total_intl_calls,
-            "Total intl charge": total_intl_charge,
-            "Customer service calls": customer_service_calls
-        }])
+    # 🔥 MUST BE NUMERIC (FIX APPLIED HERE)
+    "International plan": 1 if international_plan == "Yes" else 0,
+    "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
 
+    "Number vmail messages": number_vmail_messages,
+    "Total day minutes": total_day_minutes,
+    "Total day calls": total_day_calls,
+    "Total day charge": total_day_charge,
+    "Total eve minutes": total_eve_minutes,
+    "Total eve calls": total_eve_calls,
+    "Total eve charge": total_eve_charge,
+    "Total night minutes": total_night_minutes,
+    "Total night calls": total_night_calls,
+    "Total night charge": total_night_charge,
+    "Total intl minutes": total_intl_minutes,
+    "Total intl calls": total_intl_calls,
+    "Total intl charge": total_intl_charge,
+    "Customer service calls": customer_service_calls
+}])
+
+# FORCE ALL COLUMNS TO NUMERIC (CRITICAL FIX)
+raw_input = raw_input.apply(pd.to_numeric, errors="raise")
         # ==========================================
         # SAFE MODEL EXTRACTION (FIX APPLIED HERE)
         # ==========================================
