@@ -304,34 +304,38 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # 1. REPLICATE PREPROCESSING
+        # 1. MAKE A CLEAN COPY OF INPUTS
         processed_df = input_data.copy()
+        
+        # 2. PRE-ENCODE BINARY FEATURES TO AVOID TYPE CONFLICTS
+        if 'International plan' in processed_df.columns:
+            processed_df['International plan'] = processed_df['International plan'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+        if 'Voice mail plan' in processed_df.columns:
+            processed_df['Voice mail plan'] = processed_df['Voice mail plan'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
         if 'State' in processed_df.columns:
             processed_df = processed_df.drop('State', axis=1)
-        
-        # Apply your custom feature engineering calculations
+
+        # 3. RUN FEATURE ENGINEERING
         processed_df = create_powerful_features(processed_df)
         
-        # 2. ENCODE CATEGORICAL COLUMNS INTO NUMERIC TYPES (FIXES THE NEW ERROR)
-        # Convert text plans to binary (1 for Yes, 0 for No)
-        for col in ['International plan', 'Voice mail plan']:
-            if col in processed_df.columns:
-                processed_df[col] = processed_df[col].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
-        
-        # Handle Area Code mapping or conversion to numerical format
+        # 4. STRICT TYPE CLEANING (FIXES THE INVALID ERROR VALUE)
+        # Drop Area code if it is causing an object-type error, or force it to float64
         if 'Area code' in processed_df.columns:
-            processed_df['Area code'] = pd.to_numeric(processed_df['Area code'], errors='coerce').fillna(0).astype(int)
+            processed_df['Area code'] = pd.to_numeric(processed_df['Area code'], errors='coerce')
 
-        # Ensure all columns match numeric requirements for the ML model
-        processed_df = processed_df.apply(pd.to_numeric, errors='ignore')
+        # Convert the entire DataFrame into standard float64 numbers
+        processed_df = processed_df.astype(float)
+        
+        # Fill any unexpected NaN/Inf values that might have broken the evaluation engine
+        processed_df = processed_df.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        # 3. EXTRACT UNDERLYING MODEL SAFELY
+        # 5. EXTRACT UNDERLYING MODEL SAFELY
         if hasattr(pipeline, 'model'):
             actual_model = pipeline.model
         else:
             actual_model = pipeline
 
-        # 4. GENERATE PREDICTIONS
+        # 6. GENERATE PREDICTIONS
         probability = actual_model.predict_proba(processed_df)[0][1]
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
         prediction = probability >= threshold
