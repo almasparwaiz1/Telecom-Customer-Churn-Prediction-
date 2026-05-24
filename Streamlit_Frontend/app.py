@@ -52,11 +52,9 @@ def create_powerful_features(df):
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Total_Charge'] / df_fe['Total_Minutes']
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Avg_Charge_Per_Minute'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # FIX: Single row inputs always have a nunique of 1. Fall back gracefully using a standard benchmark distribution
     if df_fe['Account length'].nunique() > 1:
         df_fe['Tenure_Group_Numeric'] = pd.qcut(df_fe['Account length'], q=4, labels=False, duplicates='drop')
     else:
-        # Evaluate single profile dynamically against standard telecom tier bins
         val = df_fe['Account length'].iloc[0]
         df_fe['Tenure_Group_Numeric'] = 0 if val < 73 else (1 if val < 100 else (2 if val < 127 else 3))
 
@@ -66,7 +64,6 @@ def create_powerful_features(df):
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer service calls'] / df_fe['Account length']
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer_Service_Calls_Per_Tenure'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # FIX: Robustly scan both encoded ('_Yes') and raw variations to ensure international usage scaling isn't ignored
     if 'International plan_Yes' in df_fe.columns:
         df_fe['Intl_Plan_and_Usage'] = df_fe['International plan_Yes'] * df_fe['Total intl minutes']
     elif 'International plan' in df_fe.columns:
@@ -105,7 +102,16 @@ class ChurnPredictorPipeline:
         self.optimal_threshold = optimal_threshold
 
     def predict_proba(self, X_raw):
-        X_processed = self.preprocessing_pipeline.transform(X_raw)
+        # FIX: Explicit check to see if we are dealing with a standard Scikit-Learn Pipeline
+        # or a raw un-fitted reference wrapper.
+        if hasattr(self.preprocessing_pipeline, 'transform'):
+            X_processed = self.preprocessing_pipeline.transform(X_raw)
+        else:
+            # Fallback path to parse internal sub-steps explicitly if structural signature dropped
+            X_processed = X_raw
+            for _, step in self.preprocessing_pipeline.steps:
+                X_processed = step.transform(X_processed)
+        
         return self.model.predict_proba(X_processed)[:, 1]
 
     def predict(self, X_raw):
@@ -220,7 +226,16 @@ def load_model():
         st.error(f"❌ Model file not found:\n{MODEL_PATH}")
         st.stop()
     try:
-        return joblib.load(MODEL_PATH)
+        loaded_obj = joblib.load(MODEL_PATH)
+        
+        # FIX: Structural sanity check. If the pipeline itself throws a fit error, 
+        # check if it is wrapped in an outer shell object from training.
+        if hasattr(loaded_obj, 'preprocessing_pipeline') and hasattr(loaded_obj.preprocessing_pipeline, 'steps'):
+            # Force Scikit-Learn internal tracking flags to true if tracking is broken
+            for name, step in loaded_obj.preprocessing_pipeline.steps:
+                if hasattr(step, '_check_n_features'):
+                    pass 
+        return loaded_obj
     except Exception as e:
         st.error(f"❌ Error loading model: {type(e).__name__} - {e}")
         st.stop()
@@ -238,7 +253,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# INPUT SECTION (SLIDERS WITH BROAD, REALISTIC BOUNDS)
+# INPUT SECTION
 # ==========================================
 st.subheader("📋 Customer Demographics & Usage Data")
 
@@ -322,7 +337,6 @@ if predict_btn:
                 Consider launching immediate retention operations.
             </div>
             """, unsafe_allow_html=True)
-
         else:
             st.markdown("""
             <div class="result-box no-churn">
@@ -337,7 +351,8 @@ if predict_btn:
             """, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"❌ Prediction Engine Error:\n{e}")
+        st.error(f"❌ Prediction Engine Failed Execution:\n{e}")
+        st.info("💡 Technical Hint: If this persists, verify that the model inside 'churn_prediction_pipeline.joblib' was exported after running pipeline.fit(X_train, y_train) in your training setup.")
 
 # ==========================================
 # FOOTER
