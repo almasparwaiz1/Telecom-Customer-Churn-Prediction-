@@ -304,25 +304,24 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # 1. Start with the powerful calculated features
-        # (This generates Total_Charge, Total_Minutes, Avg_Charge_Per_Minute, etc.)
-        processed_df = create_powerful_features(input_data)
+        # 1. FORCE AN INDEPENDENT DEEP COPY TO BYPASS STREAMLIT CACHE TRAPS
+        raw_inputs = input_data.copy(deep=True)
         
-        # 2. MANUALLY CREATE THE ONE-HOT ENCODED COLUMNS THE MODEL EXPECTS
-        # International Plan Encoding
-        is_intl_yes = 1 if str(input_data['International plan'].iloc[0]).strip().lower() == 'yes' else 0
+        # 2. RUN INDEPENDENT FEATURE ENGINEERING
+        processed_df = create_powerful_features(raw_inputs)
+        
+        # 3. MANUALLY CREATE THE ONE-HOT ENCODED COLUMNS
+        is_intl_yes = 1 if str(raw_inputs['International plan'].iloc[0]).strip().lower() == 'yes' else 0
         processed_df['International plan_Yes'] = float(is_intl_yes)
         
-        # Voice Mail Plan Encoding
-        is_vmail_yes = 1 if str(input_data['Voice mail plan'].iloc[0]).strip().lower() == 'yes' else 0
+        is_vmail_yes = 1 if str(raw_inputs['Voice mail plan'].iloc[0]).strip().lower() == 'yes' else 0
         processed_df['Voice mail plan_Yes'] = float(is_vmail_yes)
         
-        # Area Code Encoding (Handles 415 and 510 flags; 408 acts as the implicit 0/0 baseline)
-        selected_area = int(input_data['Area code'].iloc[0])
+        selected_area = int(raw_inputs['Area code'].iloc[0])
         processed_df['Area code_415'] = float(1 if selected_area == 415 else 0)
         processed_df['Area code_510'] = float(1 if selected_area == 510 else 0)
 
-        # 3. REARRANGE AND ALIGN COLUMNS TO MATCH TRAINING SPECIFICATIONS EXACTLY
+        # 4. ALIGN FEATURES PERFECTLY WITH TRAINING SCHEMA
         expected_features_order = [
             'Account length', 'Number vmail messages', 'Total day minutes', 'Total day calls', 
             'Total day charge', 'Total eve minutes', 'Total eve calls', 'Total eve charge', 
@@ -335,23 +334,25 @@ if predict_btn:
             'Intl_Usage_Ratio'
         ]
         
-        # Filter down and reorder the dataframe to match the expected schema
-        final_input_matrix = processed_df[expected_features_order].copy()
+        # Filter down and reorder to break structural cache links
+        final_input_matrix = processed_df[expected_features_order].copy(deep=True)
 
-        # 4. STRICT NUMERIC CLEANING
+        # 5. TRANSLATE TO PURE FLOAT FOR THE COMPUTATION ENGINE
         final_input_matrix = final_input_matrix.astype(float)
         final_input_matrix = final_input_matrix.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        # 5. EXTRACT UNDERLYING MODEL SAFELY
+        # 6. EXTRACT UNDERLYING MODEL SAFELY
         if hasattr(pipeline, 'model'):
             actual_model = pipeline.model
         else:
             actual_model = pipeline
 
-        # 6. GENERATE PREDICTIONS
-        probability = actual_model.predict_proba(final_input_matrix)[0][1]
+        # 7. GENERATE DYNAMIC PREDICTIONS
+        # Calling values directly ensures the booster processes fresh values rather than cached frames
+        probability = float(actual_model.predict_proba(final_input_matrix.values)[0][1])
+        
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
-        prediction = probability >= threshold
+        prediction = bool(probability >= threshold)
 
         # ==========================================
         # RENDER PROFESSIONAL UI RESULTS
