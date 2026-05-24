@@ -305,7 +305,7 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 if predict_btn:
     try:
 
-        # CREATE RAW INPUT EXACTLY LIKE TRAINING DATA
+        # CREATE RAW INPUT
         raw_input = pd.DataFrame([{
             "Account length": account_length,
             "Area code": area_code,
@@ -327,34 +327,32 @@ if predict_btn:
             "Customer service calls": customer_service_calls
         }])
 
-        # USE TRAINED PIPELINE DIRECTLY
-# ==========================================
-# SAFE PREDICTION LOGIC
-# ==========================================
+        # ==========================================
+        # SAFE PREDICTION LOGIC
+        # ==========================================
 
-# CASE 1 → Custom wrapper pipeline
-if hasattr(pipeline, "preprocessing_pipeline") and hasattr(pipeline, "model"):
+        # CASE 1 → Custom wrapper pipeline
+        if hasattr(pipeline, "preprocessing_pipeline") and hasattr(pipeline, "model"):
 
-    # Transform data using fitted preprocessing pipeline
-    processed_data = pipeline.preprocessing_pipeline.transform(raw_input)
+            processed_data = pipeline.preprocessing_pipeline.transform(raw_input)
 
-    # Predict using fitted model
-    probability = float(
-        pipeline.model.predict_proba(processed_data)[0][1]
-    )
+            probability = float(
+                pipeline.model.predict_proba(processed_data)[0][1]
+            )
 
-# CASE 2 → Standard fitted sklearn pipeline
-else:
+        # CASE 2 → Standard sklearn pipeline
+        else:
 
-    probability = float(
-        pipeline.predict_proba(raw_input)[0][1]
-    )
+            probability = float(
+                pipeline.predict_proba(raw_input)[0][1]
+            )
+
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
 
         prediction = bool(probability >= threshold)
 
         # ==========================================
-        # RENDER RESULTS
+        # RESULTS UI
         # ==========================================
         st.markdown("---")
         st.subheader("🎯 Optimization Risk Assessment")
