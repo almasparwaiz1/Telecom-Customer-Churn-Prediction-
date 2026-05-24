@@ -328,8 +328,27 @@ if predict_btn:
         }])
 
         # USE TRAINED PIPELINE DIRECTLY
-        probability = float(pipeline.predict_proba(raw_input)[0])
+# ==========================================
+# SAFE PREDICTION LOGIC
+# ==========================================
 
+# CASE 1 → Custom wrapper pipeline
+if hasattr(pipeline, "preprocessing_pipeline") and hasattr(pipeline, "model"):
+
+    # Transform data using fitted preprocessing pipeline
+    processed_data = pipeline.preprocessing_pipeline.transform(raw_input)
+
+    # Predict using fitted model
+    probability = float(
+        pipeline.model.predict_proba(processed_data)[0][1]
+    )
+
+# CASE 2 → Standard fitted sklearn pipeline
+else:
+
+    probability = float(
+        pipeline.predict_proba(raw_input)[0][1]
+    )
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
 
         prediction = bool(probability >= threshold)
