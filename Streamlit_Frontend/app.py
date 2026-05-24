@@ -52,11 +52,9 @@ def create_powerful_features(df):
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Total_Charge'] / df_fe['Total_Minutes']
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Avg_Charge_Per_Minute'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # FIX: Single row inputs always have a nunique of 1. Fall back gracefully using a standard benchmark distribution
     if df_fe['Account length'].nunique() > 1:
         df_fe['Tenure_Group_Numeric'] = pd.qcut(df_fe['Account length'], q=4, labels=False, duplicates='drop')
     else:
-        # Evaluate single profile dynamically against standard telecom tier bins
         val = df_fe['Account length'].iloc[0]
         df_fe['Tenure_Group_Numeric'] = 0 if val < 73 else (1 if val < 100 else (2 if val < 127 else 3))
 
@@ -66,7 +64,6 @@ def create_powerful_features(df):
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer service calls'] / df_fe['Account length']
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer_Service_Calls_Per_Tenure'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
-    # FIX: Robustly scan both encoded ('_Yes') and raw variations to ensure international usage scaling isn't ignored
     if 'International plan_Yes' in df_fe.columns:
         df_fe['Intl_Plan_and_Usage'] = df_fe['International plan_Yes'] * df_fe['Total intl minutes']
     elif 'International plan' in df_fe.columns:
@@ -121,7 +118,7 @@ setattr(__main__, 'ChurnPredictorPipeline', ChurnPredictorPipeline)
 # BASE CONFIGURATION
 # ==========================================
 
-MODEL_PATH = "Streamlit_Frontend/churn_prediction_pipeline.joblib"
+MODEL_PATH = "churn_prediction_pipeline.joblib"
 
 # ==========================================
 # PAGE CONFIG
