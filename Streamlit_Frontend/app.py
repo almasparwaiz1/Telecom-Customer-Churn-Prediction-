@@ -295,6 +295,7 @@ input_data = pd.DataFrame([{
     "Customer service calls": customer_service_calls
 }])
 
+
 # ==========================================
 # PREDICTION ENGINE
 # ==========================================
@@ -303,38 +304,35 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # 1. REPLICATE PREPROCESSING PIPELINE IN PURE PYTHON
-        # Drop 'State' and convert 'Area code' to object (mimicking InitialFeaturePreparation)
+        # 1. REPLICATE PREPROCESSING
         processed_df = input_data.copy()
         if 'State' in processed_df.columns:
             processed_df = processed_df.drop('State', axis=1)
-        if 'Area code' in processed_df.columns:
-            processed_df['Area code'] = processed_df['Area code'].astype(object)
         
-        # Apply your powerful feature engineering function
+        # Apply your custom feature engineering calculations
         processed_df = create_powerful_features(processed_df)
         
-        # 2. EXTRACT UNDERLYING MODEL SAFELY
-        # We check if 'pipeline' is your wrapper, a raw pipeline, or just the model
+        # 2. ENCODE CATEGORICAL COLUMNS INTO NUMERIC TYPES (FIXES THE NEW ERROR)
+        # Convert text plans to binary (1 for Yes, 0 for No)
+        for col in ['International plan', 'Voice mail plan']:
+            if col in processed_df.columns:
+                processed_df[col] = processed_df[col].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
+        
+        # Handle Area Code mapping or conversion to numerical format
+        if 'Area code' in processed_df.columns:
+            processed_df['Area code'] = pd.to_numeric(processed_df['Area code'], errors='coerce').fillna(0).astype(int)
+
+        # Ensure all columns match numeric requirements for the ML model
+        processed_df = processed_df.apply(pd.to_numeric, errors='ignore')
+
+        # 3. EXTRACT UNDERLYING MODEL SAFELY
         if hasattr(pipeline, 'model'):
             actual_model = pipeline.model
         else:
             actual_model = pipeline
 
-        # 3. GENERATE PREDICTIONS
-        # If the model itself says it's not fitted, we force a rapid 1-row fit 
-        # to ensure the app UI never crashes for your users.
-        try:
-            probability = actual_model.predict_proba(processed_df)[0][1]
-        except Exception as fit_err:
-            if "not fitted" in str(fit_err).lower():
-                # Emergency fallback: fit the final classifier on the fly with a dummy target
-                actual_model.fit(processed_df, np.array([0]))
-                probability = actual_model.predict_proba(processed_df)[0][1]
-            else:
-                raise fit_err
-
-        # Determine thresholding based on your wrapper layout
+        # 4. GENERATE PREDICTIONS
+        probability = actual_model.predict_proba(processed_df)[0][1]
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
         prediction = probability >= threshold
 
@@ -373,4 +371,3 @@ if predict_btn:
 
     except Exception as e:
         st.error(f"❌ Prediction Engine Error:\n{e}")
-        st.info("💡 Tech Note: If this persists, your 'churn_prediction_pipeline.joblib' file was exported blank. Please re-save it in your Jupyter Notebook AFTER calling model.fit().")
