@@ -304,24 +304,65 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # 1. FORCE AN INDEPENDENT DEEP COPY TO BYPASS STREAMLIT CACHE TRAPS
-        raw_inputs = input_data.copy(deep=True)
-        
-        # 2. RUN INDEPENDENT FEATURE ENGINEERING
-        processed_df = create_powerful_features(raw_inputs)
-        
-        # 3. MANUALLY CREATE THE ONE-HOT ENCODED COLUMNS
-        is_intl_yes = 1 if str(raw_inputs['International plan'].iloc[0]).strip().lower() == 'yes' else 0
-        processed_df['International plan_Yes'] = float(is_intl_yes)
-        
-        is_vmail_yes = 1 if str(raw_inputs['Voice mail plan'].iloc[0]).strip().lower() == 'yes' else 0
-        processed_df['Voice mail plan_Yes'] = float(is_vmail_yes)
-        
-        selected_area = int(raw_inputs['Area code'].iloc[0])
-        processed_df['Area code_415'] = float(1 if selected_area == 415 else 0)
-        processed_df['Area code_510'] = float(1 if selected_area == 510 else 0)
+        # 1. CONVERT THE LIVE STREAMLIT INPUTS INTO A FRESH, CLEAN DICTIONARY
+        # This completely breaks any hidden Streamlit caching or indexing traps
+        live_data = {
+            "Account length": float(account_length),
+            "Number vmail messages": float(number_vmail_messages),
+            "Total day minutes": float(total_day_minutes),
+            "Total day calls": float(total_day_calls),
+            "Total day charge": float(total_day_charge),
+            "Total eve minutes": float(total_eve_minutes),
+            "Total eve calls": float(total_eve_calls),
+            "Total eve charge": float(total_eve_charge),
+            "Total night minutes": float(total_night_minutes),
+            "Total night calls": float(total_night_calls),
+            "Total night charge": float(total_night_charge),
+            "Total intl minutes": float(total_intl_minutes),
+            "Total intl calls": float(total_intl_calls),
+            "Total intl charge": float(total_intl_charge),
+            "Customer service calls": float(customer_service_calls)
+        }
 
-        # 4. ALIGN FEATURES PERFECTLY WITH TRAINING SCHEMA
+        # 2. COMPUTE DERIVED FEATURES MANUALLY FROM THE LIVE VALUES
+        # This ensures your math always recalculates immediately when a slider moves
+        live_data['Total_Charge'] = (live_data['Total day charge'] + live_data['Total eve charge'] + 
+                                     live_data['Total night charge'] + live_data['Total intl charge'])
+        
+        live_data['Total_Minutes'] = (live_data['Total day minutes'] + live_data['Total eve minutes'] + 
+                                      live_data['Total night minutes'] + live_data['Total intl minutes'])
+        
+        live_data['Total_Calls'] = (live_data['Total day calls'] + live_data['Total eve calls'] + 
+                                    live_data['Total night calls'] + live_data['Total intl calls'])
+
+        live_data['Avg_Charge_Per_Minute'] = live_data['Total_Charge'] / live_data['Total_Minutes'] if live_data['Total_Minutes'] > 0 else 0.0
+
+        # Dynamic profile evaluation against standard telecom tiers
+        val = live_data['Account length']
+        live_data['Tenure_Group_Numeric'] = 0.0 if val < 73 else (1.0 if val < 100 else (2.0 if val < 127 else 3.0))
+
+        live_data['Voicemail_Per_Tenure'] = live_data['Number vmail messages'] / val if val > 0 else 0.0
+        live_data['Customer_Service_Calls_Per_Tenure'] = live_data['Customer service calls'] / val if val > 0 else 0.0
+
+        # One-Hot Encoding values mapped from selectboxes
+        is_intl_yes = 1.0 if str(international_plan).strip().lower() == 'yes' else 0.0
+        live_data['International plan_Yes'] = is_intl_yes
+        live_data['Intl_Plan_and_Usage'] = is_intl_yes * live_data['Total intl minutes']
+
+        live_data['Voice mail plan_Yes'] = 1.0 if str(voice_mail_plan).strip().lower() == 'yes' else 0.0
+
+        # Handle Area Code flags
+        live_data['Area code_415'] = 1.0 if area_code == 415 else 0.0
+        live_data['Area code_510'] = 1.0 if area_code == 510 else 0.0
+
+        # Usage ratios
+        tot_min = live_data['Total_Minutes']
+        live_data['Day_Usage_Ratio'] = live_data['Total day minutes'] / tot_min if tot_min > 0 else 0.0
+        live_data['Eve_Usage_Ratio'] = live_data['Total eve minutes'] / tot_min if tot_min > 0 else 0.0
+        live_data['Night_Usage_Ratio'] = live_data['Total night minutes'] / tot_min if tot_min > 0 else 0.0
+        live_data['Intl_Usage_Ratio'] = live_data['Total intl minutes'] / tot_min if tot_min > 0 else 0.0
+
+        # 3. CREATE FINAL DATAFRAME IN THE PERFECT ORDER THE MODEL DEMANDS
         expected_features_order = [
             'Account length', 'Number vmail messages', 'Total day minutes', 'Total day calls', 
             'Total day charge', 'Total eve minutes', 'Total eve calls', 'Total eve charge', 
@@ -333,29 +374,24 @@ if predict_btn:
             'Intl_Plan_and_Usage', 'Day_Usage_Ratio', 'Eve_Usage_Ratio', 'Night_Usage_Ratio', 
             'Intl_Usage_Ratio'
         ]
-        
-        # Filter down and reorder to break structural cache links
-        final_input_matrix = processed_df[expected_features_order].copy(deep=True)
 
-        # 5. TRANSLATE TO PURE FLOAT FOR THE COMPUTATION ENGINE
-        final_input_matrix = final_input_matrix.astype(float)
+        # Structure as a clean 1-row DataFrame matrix
+        final_input_matrix = pd.DataFrame([live_data])[expected_features_order].astype(float)
         final_input_matrix = final_input_matrix.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        # 6. EXTRACT UNDERLYING MODEL SAFELY
+        # 4. EXTRACT MODEL AND COERCE PREDICTION
         if hasattr(pipeline, 'model'):
             actual_model = pipeline.model
         else:
             actual_model = pipeline
 
-        # 7. GENERATE DYNAMIC PREDICTIONS
-        # Calling values directly ensures the booster processes fresh values rather than cached frames
+        # Use raw values array to completely break any structural cache indexing constraints
         probability = float(actual_model.predict_proba(final_input_matrix.values)[0][1])
-        
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
         prediction = bool(probability >= threshold)
 
         # ==========================================
-        # RENDER PROFESSIONAL UI RESULTS
+        # RENDER DYNAMIC UI RESULTS
         # ==========================================
         st.markdown("---")
         st.subheader("🎯 Optimization Risk Assessment")
