@@ -52,9 +52,11 @@ def create_powerful_features(df):
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Total_Charge'] / df_fe['Total_Minutes']
     df_fe['Avg_Charge_Per_Minute'] = df_fe['Avg_Charge_Per_Minute'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
+    # FIX: Single row inputs always have a nunique of 1. Fall back gracefully using a standard benchmark distribution
     if df_fe['Account length'].nunique() > 1:
         df_fe['Tenure_Group_Numeric'] = pd.qcut(df_fe['Account length'], q=4, labels=False, duplicates='drop')
     else:
+        # Evaluate single profile dynamically against standard telecom tier bins
         val = df_fe['Account length'].iloc[0]
         df_fe['Tenure_Group_Numeric'] = 0 if val < 73 else (1 if val < 100 else (2 if val < 127 else 3))
 
@@ -64,6 +66,7 @@ def create_powerful_features(df):
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer service calls'] / df_fe['Account length']
     df_fe['Customer_Service_Calls_Per_Tenure'] = df_fe['Customer_Service_Calls_Per_Tenure'].replace([np.inf, -np.inf], np.nan).fillna(0)
 
+    # FIX: Robustly scan both encoded ('_Yes') and raw variations to ensure international usage scaling isn't ignored
     if 'International plan_Yes' in df_fe.columns:
         df_fe['Intl_Plan_and_Usage'] = df_fe['International plan_Yes'] * df_fe['Total intl minutes']
     elif 'International plan' in df_fe.columns:
@@ -102,18 +105,7 @@ class ChurnPredictorPipeline:
         self.optimal_threshold = optimal_threshold
 
     def predict_proba(self, X_raw):
-        if hasattr(self.preprocessing_pipeline, 'transform'):
-            try:
-                X_processed = self.preprocessing_pipeline.transform(X_raw)
-            except Exception:
-                X_processed = X_raw
-                for _, step in self.preprocessing_pipeline.steps:
-                    X_processed = step.transform(X_processed)
-        else:
-            X_processed = X_raw
-            for _, step in self.preprocessing_pipeline.steps:
-                X_processed = step.transform(X_processed)
-        
+        X_processed = self.preprocessing_pipeline.transform(X_raw)
         return self.model.predict_proba(X_processed)[:, 1]
 
     def predict(self, X_raw):
@@ -220,33 +212,6 @@ h3, .stSubheader {
 """, unsafe_allow_html=True)
 
 # ==========================================
-# RECOVERY HELPER: DUMMY FIT TO REPAIR STATE
-# ==========================================
-def force_fit_pipeline(loaded_obj):
-    mock_sample = pd.DataFrame([{
-        "Account length": 100, "Area code": 415, "International plan": "No", "Voice mail plan": "No",
-        "Number vmail messages": 0, "Total day minutes": 180.0, "Total day calls": 100, "Total day charge": 30.0,
-        "Total eve minutes": 180.0, "Total eve calls": 100, "Total eve charge": 15.0, "Total night minutes": 180.0,
-        "Total night calls": 100, "Total night charge": 8.0, "Total intl minutes": 10.0, "Total intl calls": 4,
-        "Total intl charge": 2.7, "Customer service calls": 1
-    }])
-    
-    prep = getattr(loaded_obj, 'preprocessing_pipeline', None)
-    if prep is not None:
-        try:
-            prep.fit(mock_sample)
-        except Exception:
-            if hasattr(prep, 'steps'):
-                X_tmp = mock_sample
-                for name, step in prep.steps:
-                    try:
-                        step.fit(X_tmp)
-                        X_tmp = step.transform(X_tmp)
-                    except Exception:
-                        pass
-    return loaded_obj
-
-# ==========================================
 # LOAD MODEL
 # ==========================================
 @st.cache_resource
@@ -255,9 +220,7 @@ def load_model():
         st.error(f"❌ Model file not found:\n{MODEL_PATH}")
         st.stop()
     try:
-        loaded_obj = joblib.load(MODEL_PATH)
-        loaded_obj = force_fit_pipeline(loaded_obj)
-        return loaded_obj
+        return joblib.load(MODEL_PATH)
     except Exception as e:
         st.error(f"❌ Error loading model: {type(e).__name__} - {e}")
         st.stop()
@@ -275,7 +238,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ==========================================
-# INPUT SECTION
+# INPUT SECTION (SLIDERS WITH BROAD, REALISTIC BOUNDS)
 # ==========================================
 st.subheader("📋 Customer Demographics & Usage Data")
 
@@ -309,7 +272,7 @@ with col3:
     total_intl_charge = st.slider("International Charge ($)", min_value=0.0, max_value=15.0, value=2.7, step=0.1)
 
 # ==========================================
-# CREATE DATAFRAME (FIXED: ALL 19 COLUMNS ADDED)
+# CREATE DATAFRAME
 # ==========================================
 input_data = pd.DataFrame([{
     "Account length": account_length,
@@ -359,6 +322,7 @@ if predict_btn:
                 Consider launching immediate retention operations.
             </div>
             """, unsafe_allow_html=True)
+
         else:
             st.markdown("""
             <div class="result-box no-churn">
@@ -373,7 +337,7 @@ if predict_btn:
             """, unsafe_allow_html=True)
 
     except Exception as e:
-        st.error(f"❌ Prediction Engine Failed Execution:\n{e}")
+        st.error(f"❌ Prediction Engine Error:\n{e}")
 
 # ==========================================
 # FOOTER
