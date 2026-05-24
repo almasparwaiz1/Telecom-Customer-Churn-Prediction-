@@ -120,7 +120,7 @@ setattr(__main__, 'ChurnPredictorPipeline', ChurnPredictorPipeline)
 # ==========================================
 # BASE CONFIGURATION
 # ==========================================
-BASE_DIR = r"F:\AI and Data Science Projects\Telecom churn prediction app\Streamlit_Frontend"
+BASE_DIR = r"Streamlit_Frontend"
 MODEL_PATH = os.path.join(BASE_DIR, "churn_prediction_pipeline.joblib")
 
 # ==========================================
