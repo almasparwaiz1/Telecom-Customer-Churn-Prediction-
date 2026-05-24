@@ -102,12 +102,10 @@ class ChurnPredictorPipeline:
         self.optimal_threshold = optimal_threshold
 
     def predict_proba(self, X_raw):
-        # Fallback tracking bypass execution
         if hasattr(self.preprocessing_pipeline, 'transform'):
             try:
                 X_processed = self.preprocessing_pipeline.transform(X_raw)
             except Exception:
-                # Direct step parsing if main execution tracking fails
                 X_processed = X_raw
                 for _, step in self.preprocessing_pipeline.steps:
                     X_processed = step.transform(X_processed)
@@ -225,10 +223,6 @@ h3, .stSubheader {
 # RECOVERY HELPER: DUMMY FIT TO REPAIR STATE
 # ==========================================
 def force_fit_pipeline(loaded_obj):
-    """
-    Creates a sample context structure matching the app layout schema 
-    to force-fit uninitialized sub-transformers dynamically.
-    """
     mock_sample = pd.DataFrame([{
         "Account length": 100, "Area code": 415, "International plan": "No", "Voice mail plan": "No",
         "Number vmail messages": 0, "Total day minutes": 180.0, "Total day calls": 100, "Total day charge": 30.0,
@@ -237,14 +231,11 @@ def force_fit_pipeline(loaded_obj):
         "Total intl charge": 2.7, "Customer service calls": 1
     }])
     
-    # Extract inner processing block
     prep = getattr(loaded_obj, 'preprocessing_pipeline', None)
     if prep is not None:
         try:
-            # Attempt to fit the transformation blocks using the base blueprint structure
             prep.fit(mock_sample)
         except Exception:
-            # Fallback to structural iteration over internal named pipeline tuples
             if hasattr(prep, 'steps'):
                 X_tmp = mock_sample
                 for name, step in prep.steps:
@@ -256,7 +247,7 @@ def force_fit_pipeline(loaded_obj):
     return loaded_obj
 
 # ==========================================
-# LOAD MODEL WITH RUNTIME RECOVERY
+# LOAD MODEL
 # ==========================================
 @st.cache_resource
 def load_model():
@@ -265,8 +256,6 @@ def load_model():
         st.stop()
     try:
         loaded_obj = joblib.load(MODEL_PATH)
-        
-        # Run state diagnostics and automatically repair un-fitted blocks
         loaded_obj = force_fit_pipeline(loaded_obj)
         return loaded_obj
     except Exception as e:
@@ -320,7 +309,7 @@ with col3:
     total_intl_charge = st.slider("International Charge ($)", min_value=0.0, max_value=15.0, value=2.7, step=0.1)
 
 # ==========================================
-# CREATE DATAFRAME
+# CREATE DATAFRAME (FIXED: ALL 19 COLUMNS ADDED)
 # ==========================================
 input_data = pd.DataFrame([{
     "Account length": account_length,
