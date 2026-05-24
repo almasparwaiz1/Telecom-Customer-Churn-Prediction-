@@ -299,6 +299,10 @@ input_data = pd.DataFrame([{
 # ==========================================
 # PREDICTION ENGINE (FIXED - SAFE VERSION)
 # ==========================================
+
+st.markdown("<br>", unsafe_allow_html=True)
+predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
+
 if predict_btn:
     try:
 
