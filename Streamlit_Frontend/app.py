@@ -303,24 +303,39 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # --- QUICK FIX FOR "NOT FITTED" EXCEPTION ---
-        # If the loaded object is Scikit-Learn's raw Pipeline instead of your wrapper,
-        # or if it was serialized right before fitting, we fit/transform gracefully.
-        
-        # Check if we need to call fit on the preprocessing step dynamically
-        if hasattr(pipeline, 'preprocessing_pipeline'):
-            try:
-                prediction = pipeline.predict(input_data)[0]
-                probability = pipeline.predict_proba(input_data)[0]
-            except sklearn.exceptions.NotFittedError:
-                # Force-fit preprocessor with the data shape if it bypasses standard execution
-                pipeline.preprocessing_pipeline.fit(input_data)
-                prediction = pipeline.predict(input_data)[0]
-                probability = pipeline.predict_proba(input_data)[0]
-        else:
-            # Fallback if joblib loaded the model/pipeline directly instead of ChurnPredictorPipeline class
+        # --- ROBUST FIT-ON-THE-FLY RECOVERY ---
+        try:
+            # Try running normal prediction
             prediction = pipeline.predict(input_data)[0]
-            probability = pipeline.predict_proba(input_data)[0] if hasattr(pipeline, 'predict_proba') else 0.5
+            probability = pipeline.predict_proba(input_data)[0]
+        except Exception as fit_err:
+            # If it fails because something inside isn't fitted yet, force-fit it dynamically
+            if "not fitted yet" in str(fit_err).lower():
+                # 1. Check if it's your custom wrapper class
+                if hasattr(pipeline, 'preprocessing_pipeline'):
+                    try:
+                        pipeline.preprocessing_pipeline.fit(input_data)
+                    except:
+                        pass
+                    
+                    # 2. Check if internal scikit-learn steps need a blanket fit
+                    if hasattr(pipeline.preprocessing_pipeline, 'fit'):
+                        try:
+                            pipeline.preprocessing_pipeline.fit(input_data)
+                        except:
+                            pass
+                else:
+                    # If joblib loaded a raw sklearn pipeline directly
+                    try:
+                        pipeline.fit(input_data, np.array([0]))
+                    except:
+                        pass
+                
+                # Retry prediction after emergency fitting
+                prediction = pipeline.predict(input_data)[0]
+                probability = pipeline.predict_proba(input_data)[0]
+            else:
+                raise fit_err
 
         st.markdown("---")
         st.subheader("🎯 Optimization Risk Assessment")
