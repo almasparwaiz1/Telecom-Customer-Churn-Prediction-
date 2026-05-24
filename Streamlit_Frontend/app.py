@@ -304,52 +304,52 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 
 if predict_btn:
     try:
-        # 1. MAKE A CLEAN COPY OF INPUTS
-        processed_df = input_data.copy()
+        # 1. Start with the powerful calculated features
+        # (This generates Total_Charge, Total_Minutes, Avg_Charge_Per_Minute, etc.)
+        processed_df = create_powerful_features(input_data)
         
-        # 2. PRE-ENCODE BINARY FEATURES TO AVOID TYPE CONFLICTS
-        if 'International plan' in processed_df.columns:
-            processed_df['International plan'] = processed_df['International plan'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
-        if 'Voice mail plan' in processed_df.columns:
-            processed_df['Voice mail plan'] = processed_df['Voice mail plan'].apply(lambda x: 1 if str(x).strip().lower() == 'yes' else 0)
-
-        # 3. RUN FEATURE ENGINEERING
-        processed_df = create_powerful_features(processed_df)
+        # 2. MANUALLY CREATE THE ONE-HOT ENCODED COLUMNS THE MODEL EXPECTS
+        # International Plan Encoding
+        is_intl_yes = 1 if str(input_data['International plan'].iloc[0]).strip().lower() == 'yes' else 0
+        processed_df['International plan_Yes'] = float(is_intl_yes)
         
-        # 4. STRICT TYPE CLEANING & RECOVERY
-        if 'Area code' in processed_df.columns:
-            processed_df['Area code'] = pd.to_numeric(processed_df['Area code'], errors='coerce')
+        # Voice Mail Plan Encoding
+        is_vmail_yes = 1 if str(input_data['Voice mail plan'].iloc[0]).strip().lower() == 'yes' else 0
+        processed_df['Voice mail plan_Yes'] = float(is_vmail_yes)
+        
+        # Area Code Encoding (Handles 415 and 510 flags; 408 acts as the implicit 0/0 baseline)
+        selected_area = int(input_data['Area code'].iloc[0])
+        processed_df['Area code_415'] = float(1 if selected_area == 415 else 0)
+        processed_df['Area code_510'] = float(1 if selected_area == 510 else 0)
 
-        # Convert the DataFrame into standard float64 numbers
-        processed_df = processed_df.astype(float)
-        processed_df = processed_df.replace([np.inf, -np.inf], np.nan).fillna(0)
+        # 3. REARRANGE AND ALIGN COLUMNS TO MATCH TRAINING SPECIFICATIONS EXACTLY
+        expected_features_order = [
+            'Account length', 'Number vmail messages', 'Total day minutes', 'Total day calls', 
+            'Total day charge', 'Total eve minutes', 'Total eve calls', 'Total eve charge', 
+            'Total night minutes', 'Total night calls', 'Total night charge', 'Total intl minutes', 
+            'Total intl calls', 'Total intl charge', 'Customer service calls', 
+            'International plan_Yes', 'Voice mail plan_Yes', 'Area code_415', 'Area code_510', 
+            'Total_Charge', 'Total_Minutes', 'Total_Calls', 'Avg_Charge_Per_Minute', 
+            'Tenure_Group_Numeric', 'Voicemail_Per_Tenure', 'Customer_Service_Calls_Per_Tenure', 
+            'Intl_Plan_and_Usage', 'Day_Usage_Ratio', 'Eve_Usage_Ratio', 'Night_Usage_Ratio', 
+            'Intl_Usage_Ratio'
+        ]
+        
+        # Filter down and reorder the dataframe to match the expected schema
+        final_input_matrix = processed_df[expected_features_order].copy()
 
-        # 5. DYNAMIC FEATURE ALIGNMENT (FORCE 31 COLUMNS)
-        # If we are short a column, add a padding column to satisfy the model matrix constraints
-        if processed_df.shape[1] == 30:
-            # Add back 'State' or a generic placeholder feature that your training dataset had
-            processed_df['State_Placeholder'] = 0.0
+        # 4. STRICT NUMERIC CLEANING
+        final_input_matrix = final_input_matrix.astype(float)
+        final_input_matrix = final_input_matrix.replace([np.inf, -np.inf], np.nan).fillna(0)
 
-        # 6. EXTRACT UNDERLYING MODEL SAFELY
+        # 5. EXTRACT UNDERLYING MODEL SAFELY
         if hasattr(pipeline, 'model'):
             actual_model = pipeline.model
         else:
             actual_model = pipeline
 
-        # 7. GENERATE PREDICTIONS
-        try:
-            # Attempt normal prediction matrix evaluation
-            probability = actual_model.predict_proba(processed_df)[0][1]
-        except Exception as shape_err:
-            # Ultimate fail-safe fallback: if shape check still drops an error, try disabling it
-            try:
-                probability = actual_model.predict_proba(processed_df, predict_disable_shape_check=True)[0][1]
-            except:
-                # If everything else fails, we use the standard prediction method directly
-                probability = actual_model.predict(processed_df)[0]
-                # Map raw binary classification outputs to probability decimals
-                probability = 0.85 if probability == 1 or probability is True else 0.15
-            
+        # 6. GENERATE PREDICTIONS
+        probability = actual_model.predict_proba(final_input_matrix)[0][1]
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
         prediction = probability >= threshold
 
