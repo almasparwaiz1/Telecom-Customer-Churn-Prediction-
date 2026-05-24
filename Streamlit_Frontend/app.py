@@ -299,95 +299,59 @@ input_data = pd.DataFrame([{
 # ==========================================
 # PREDICTION ENGINE (FIXED - SAFE VERSION)
 # ==========================================
-st.markdown("<br>", unsafe_allow_html=True)
-predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
+if predict_btn:
+    try:
 
-raw_input = pd.DataFrame([{
-    "Account length": account_length,
-    "Area code": area_code,
+        raw_input = pd.DataFrame([{
+            "Account length": account_length,
+            "Area code": area_code,
+            "International plan": 1 if international_plan == "Yes" else 0,
+            "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
+            "Number vmail messages": number_vmail_messages,
+            "Total day minutes": total_day_minutes,
+            "Total day calls": total_day_calls,
+            "Total day charge": total_day_charge,
+            "Total eve minutes": total_eve_minutes,
+            "Total eve calls": total_eve_calls,
+            "Total eve charge": total_eve_charge,
+            "Total night minutes": total_night_minutes,
+            "Total night calls": total_night_calls,
+            "Total night charge": total_night_charge,
+            "Total intl minutes": total_intl_minutes,
+            "Total intl calls": total_intl_calls,
+            "Total intl charge": total_intl_charge,
+            "Customer service calls": customer_service_calls
+        }])
 
-    # 🔥 MUST BE NUMERIC (FIX APPLIED HERE)
-    "International plan": 1 if international_plan == "Yes" else 0,
-    "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
-
-    "Number vmail messages": number_vmail_messages,
-    "Total day minutes": total_day_minutes,
-    "Total day calls": total_day_calls,
-    "Total day charge": total_day_charge,
-    "Total eve minutes": total_eve_minutes,
-    "Total eve calls": total_eve_calls,
-    "Total eve charge": total_eve_charge,
-    "Total night minutes": total_night_minutes,
-    "Total night calls": total_night_calls,
-    "Total night charge": total_night_charge,
-    "Total intl minutes": total_intl_minutes,
-    "Total intl calls": total_intl_calls,
-    "Total intl charge": total_intl_charge,
-    "Customer service calls": customer_service_calls
-}])
-
-# FORCE ALL COLUMNS TO NUMERIC (CRITICAL FIX)
-raw_input = raw_input.apply(pd.to_numeric, errors="raise")
-        # ==========================================
-        # SAFE MODEL EXTRACTION (FIX APPLIED HERE)
-        # ==========================================
+        # 🔥 IMPORTANT: NO EXTRA INDENT
         model = pipeline
 
-        # unwrap custom pipeline if needed
         if hasattr(model, "model"):
             model = model.model
 
-        # check validity
-        if not hasattr(model, "predict_proba"):
-            st.error("❌ Model is not valid or not fitted properly.")
-            st.stop()
+        raw_input = raw_input.apply(pd.to_numeric, errors="raise")
 
-        # prediction (SAFE)
-        try:
-            probability = float(model.predict_proba(raw_input)[0][1])
-        except Exception as e:
-            st.error(f"❌ Prediction failed (model likely not fitted): {e}")
-            st.stop()
+        probability = float(model.predict_proba(raw_input)[0][1])
 
-        # threshold
-        threshold = getattr(pipeline, 'optimal_threshold', 0.5)
+        threshold = getattr(pipeline, "optimal_threshold", 0.5)
         prediction = bool(probability >= threshold)
 
-        # ==========================================
-        # RESULTS UI
-        # ==========================================
         st.markdown("---")
         st.subheader("🎯 Optimization Risk Assessment")
 
         if prediction:
-
             st.markdown("""
             <div class="result-box churn">
                 ⚠️ High Risk Profile: Customer is likely to CHURN
             </div>
             """, unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div class="prob-card">
-                <strong>Action Required:</strong>
-                Churn Risk Factor is at <strong>{probability:.2%}</strong>.
-            </div>
-            """, unsafe_allow_html=True)
-
         else:
-
             st.markdown("""
             <div class="result-box no-churn">
                 🛡️ Stable Profile: Customer is Retained (Active)
             </div>
             """, unsafe_allow_html=True)
 
-            st.markdown(f"""
-            <div class="prob-card">
-                <strong>Account Status:</strong>
-                Stability confidence is <strong>{(1 - probability):.2%}</strong>.
-            </div>
-            """, unsafe_allow_html=True)
-
     except Exception as e:
-        st.error(f"❌ Prediction Engine Error:\n{e}")
+        st.error(f"❌ Prediction Error: {e}")
