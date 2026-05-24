@@ -309,8 +309,8 @@ if predict_btn:
         raw_input = pd.DataFrame([{
             "Account length": account_length,
             "Area code": area_code,
-            "International plan": 1 if international_plan == "Yes" else 0,
-            "Voice mail plan": 1 if voice_mail_plan == "Yes" else 0,
+            "International plan": international_plan,
+            "Voice mail plan": voice_mail_plan,
             "Number vmail messages": number_vmail_messages,
             "Total day minutes": total_day_minutes,
             "Total day calls": total_day_calls,
@@ -327,15 +327,8 @@ if predict_btn:
             "Customer service calls": customer_service_calls
         }])
 
-        # 🔥 IMPORTANT: NO EXTRA INDENT
-        model = pipeline
-
-        if hasattr(model, "model"):
-            model = model.model
-
-        raw_input = raw_input.apply(pd.to_numeric, errors="raise")
-
-        probability = float(model.predict_proba(raw_input)[0][1])
+        # 🚨 CRITICAL FIX: USE FULL TRAINED PIPELINE ONLY
+        probability = float(pipeline.predict_proba(raw_input)[0][1])
 
         threshold = getattr(pipeline, "optimal_threshold", 0.5)
         prediction = bool(probability >= threshold)
