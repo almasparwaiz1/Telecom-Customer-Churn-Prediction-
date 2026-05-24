@@ -297,7 +297,7 @@ input_data = pd.DataFrame([{
 
 
 # ==========================================
-# PREDICTION ENGINE
+# PREDICTION ENGINE (FIXED - SAFE VERSION)
 # ==========================================
 st.markdown("<br>", unsafe_allow_html=True)
 predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
@@ -305,7 +305,7 @@ predict_btn = st.button("📊 Evaluate Customer Accounts Risk")
 if predict_btn:
     try:
 
-        # CREATE RAW INPUT EXACTLY LIKE TRAINING DATA
+        # CREATE RAW INPUT
         raw_input = pd.DataFrame([{
             "Account length": account_length,
             "Area code": area_code,
@@ -327,15 +327,33 @@ if predict_btn:
             "Customer service calls": customer_service_calls
         }])
 
-        # USE TRAINED PIPELINE DIRECTLY
-        probability = float(pipeline.predict_proba(raw_input)[0])
+        # ==========================================
+        # SAFE MODEL EXTRACTION (FIX APPLIED HERE)
+        # ==========================================
+        model = pipeline
 
+        # unwrap custom pipeline if needed
+        if hasattr(model, "model"):
+            model = model.model
+
+        # check validity
+        if not hasattr(model, "predict_proba"):
+            st.error("❌ Model is not valid or not fitted properly.")
+            st.stop()
+
+        # prediction (SAFE)
+        try:
+            probability = float(model.predict_proba(raw_input)[0][1])
+        except Exception as e:
+            st.error(f"❌ Prediction failed (model likely not fitted): {e}")
+            st.stop()
+
+        # threshold
         threshold = getattr(pipeline, 'optimal_threshold', 0.5)
-
         prediction = bool(probability >= threshold)
 
         # ==========================================
-        # RENDER RESULTS
+        # RESULTS UI
         # ==========================================
         st.markdown("---")
         st.subheader("🎯 Optimization Risk Assessment")
@@ -352,7 +370,6 @@ if predict_btn:
             <div class="prob-card">
                 <strong>Action Required:</strong>
                 Churn Risk Factor is at <strong>{probability:.2%}</strong>.
-                Consider launching immediate retention operations.
             </div>
             """, unsafe_allow_html=True)
 
@@ -367,9 +384,7 @@ if predict_btn:
             st.markdown(f"""
             <div class="prob-card">
                 <strong>Account Status:</strong>
-                Account stability healthy with a
-                <strong>{(1 - probability):.2%}</strong>
-                retention confidence factor.
+                Stability confidence is <strong>{(1 - probability):.2%}</strong>.
             </div>
             """, unsafe_allow_html=True)
 
