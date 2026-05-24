@@ -118,7 +118,7 @@ setattr(__main__, 'ChurnPredictorPipeline', ChurnPredictorPipeline)
 # BASE CONFIGURATION
 # ==========================================
 
-MODEL_PATH = "churn_prediction_pipeline.joblib"
+MODEL_PATH = "Streamlit_Frontend/churn_prediction_pipeline.joblib"
 
 # ==========================================
 # PAGE CONFIG
