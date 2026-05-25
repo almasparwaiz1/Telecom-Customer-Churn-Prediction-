@@ -206,6 +206,7 @@ class FallbackMockClassifier(BaseEstimator, TransformerMixin):
     def predict(self, X):
         return np.zeros(len(X))
     def predict_proba(self, X):
+        # Outputs a structured probability matrix matching prediction parameters
         preds = np.random.uniform(0.1, 0.45, size=len(X))
         return np.column_stack([1 - preds, preds])
 
@@ -281,17 +282,14 @@ def run_streamlit_app():
             color: #1A1A1A !important;
             font-weight: 600 !important;
         }
-        /* Custom adjustment for sliders visibility */
-        div[data-testid="stSlider"] {
-            padding-bottom: 10px;
-        }
     </style>
     """, unsafe_allow_html=True)
 
     st.title("📊 Telecom Customer Churn Prediction Engine")
-    st.markdown("Adjust user profile metrics below via sliders to calculate churn vulnerability risk indexes.")
+    st.markdown("Enter core account telemetry items below to check real-time account risk factor probabilities.")
     st.markdown("---")
 
+    # Handle missing deployment files proactively to prevent application breakdown
     if not PIPELINE_PATH.exists() or not THRESHOLD_PATH.exists():
         auto_initialize_missing_assets()
         st.info("ℹ️ System initialized with an internal baseline template. To inject your optimized hyperparameter model checkpoints, execute the `build_and_export_pipeline` parameters inside your training notebook workspace.")
@@ -302,36 +300,36 @@ def run_streamlit_app():
 
     pipeline, threshold = load_deployment_artifacts()
 
-    # Form Interface Configuration using sliders
+    # Form Interface Configuration
     with st.form("prediction_input_form"):
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.markdown("### 📞 Account Profile")
-            account_length = st.slider("Account Length (Months)", min_value=1, max_value=250, value=100, step=1)
+            account_length = st.number_input("Account Length (Months)", min_value=1, value=100)
             area_code = st.selectbox("Area Code", options=[408, 415, 510])
             intl_plan = st.selectbox("International Plan", options=["No", "Yes"])
             vmail_plan = st.selectbox("Voice Mail Plan", options=["No", "Yes"])
-            vmail_msg = st.slider("Number of Voice Mail Messages", min_value=0, max_value=60, value=0, step=1)
+            vmail_msg = st.number_input("Number of Voice Mail Messages", min_value=0, value=0)
 
         with col2:
             st.markdown("### ☀️ Daytime & Evening Metrics")
-            day_mins = st.slider("Total Day Minutes", min_value=0.0, max_value=400.0, value=180.0, step=0.5)
-            day_calls = st.slider("Total Day Calls", min_value=0, max_value=200, value=100, step=1)
-            day_charge = st.slider("Total Day Charge ($)", min_value=0.0, max_value=70.0, value=30.0, step=0.25)
-            eve_mins = st.slider("Total Evening Minutes", min_value=0.0, max_value=400.0, value=200.0, step=0.5)
-            eve_calls = st.slider("Total Evening Calls", min_value=0, max_value=200, value=100, step=1)
-            eve_charge = st.slider("Total Evening Charge ($)", min_value=0.0, max_value=40.0, value=17.0, step=0.25)
+            day_mins = st.number_input("Total Day Minutes", min_value=0.0, value=180.0)
+            day_calls = st.number_input("Total Day Calls", min_value=0, value=100)
+            day_charge = st.number_input("Total Day Charge ($)", min_value=0.0, value=30.0)
+            eve_mins = st.number_input("Total Evening Minutes", min_value=0.0, value=200.0)
+            eve_calls = st.number_input("Total Evening Calls", min_value=0, value=100)
+            eve_charge = st.number_input("Total Evening Charge ($)", min_value=0.0, value=17.0)
 
         with col3:
             st.markdown("### 🌙 Nighttime & Service Metrics")
-            night_mins = st.slider("Total Night Minutes", min_value=0.0, max_value=400.0, value=200.0, step=0.5)
-            night_calls = st.slider("Total Night Calls", min_value=0, max_value=200, value=100, step=1)
-            night_charge = st.slider("Total Night Charge ($)", min_value=0.0, max_value=25.0, value=9.0, step=0.25)
-            intl_mins = st.slider("Total International Minutes", min_value=0.0, max_value=25.0, value=10.0, step=0.1)
-            intl_calls = st.slider("Total International Calls", min_value=0, max_value=25, value=3, step=1)
-            intl_charge = st.slider("Total International Charge ($)", min_value=0.0, max_value=7.0, value=2.7, step=0.1)
-            cust_service_calls = st.slider("Customer Service Calls", min_value=0, max_value=12, value=1, step=1)
+            night_mins = st.number_input("Total Night Minutes", min_value=0.0, value=200.0)
+            night_calls = st.number_input("Total Night Calls", min_value=0, value=100)
+            night_charge = st.number_input("Total Night Charge ($)", min_value=0.0, value=9.0)
+            intl_mins = st.number_input("Total International Minutes", min_value=0.0, value=10.0)
+            intl_calls = st.number_input("Total International Calls", min_value=0, value=3)
+            intl_charge = st.number_input("Total International Charge ($)", min_value=0.0, value=2.7)
+            cust_service_calls = st.number_input("Customer Service Calls", min_value=0, value=1)
 
         submit = st.form_submit_button("Run Churn Diagnostic Evaluation")
 
