@@ -1,6 +1,6 @@
 ## Customer Churn Prediction App
 
- ### The Problem — “The Mess”
+ ### The Problem 
 
 Telecom companies often struggle with customer churn, losing valuable users without clear warning signs.
 Customer data is typically scattered across multiple features—usage patterns, service subscriptions, billing behavior—making it difficult to identify at-risk customers early.
@@ -11,7 +11,7 @@ High customer acquisition costs
 Missed retention opportunities
 Revenue leakage
 
-### The Fix — “My Approach”
+### My Approach
 
 I built an end-to-end Machine Learning web application that predicts customer churn in real time.
 
@@ -32,7 +32,7 @@ Scikit-learn
 Joblib
 Matplotlib
 
-### The Result — “Business Impact”
+### Business Impact
 
 Identifies high-risk customers before churn happens
 Enables targeted retention strategies
